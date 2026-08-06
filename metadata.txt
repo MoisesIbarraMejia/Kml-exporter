@@ -1,0 +1,37 @@
+# This file contains metadata for your plugin.
+# This file should be included when you package your plugin.
+
+# Mandatory items:
+[general]
+name=KML Exporter
+qgisMinimumVersion=3.0
+description=Herramienta para exportar capas a KML con control de SchemaData, atributos y estilos de íconos
+version=0.1
+author=Moises Ibarra / Geoma
+email=moychez25@gmail.com
+
+about=This plugin allows users to export vector layers to KML format, providing full control over attribute mapping, SchemaData structure, and the preservation of custom QGIS symbology and icons.
+
+tracker=https://github.com/MoisesIbarraMejia/Kml-exporter/issues
+repository=https://github.com/MoisesIbarraMejia/Kml-exporter
+# End of mandatory metadata
+
+# Recommended items:
+
+hasProcessingProvider=no
+# changelog=
+
+tags=python, kml, export, schema, qgis
+
+homepage=https://github.com/MoisesIbarraMejia/Kml-exporter
+category=Plugins
+icon=icon.png
+experimental=True
+deprecated=False
+
+# plugin_dependencies=
+
+# Category of the plugin: Raster, Vector, Database or Web
+# category=
+
+server=False

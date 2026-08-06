@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/kml_schema_exporter" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>
