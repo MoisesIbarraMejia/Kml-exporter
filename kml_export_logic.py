@@ -166,47 +166,59 @@ def _symbol_to_temp_png(symbol, size=64):
     return tmp.name
 
 
-def _extract_symbol_style(symbol, geom_type):
+def _extract_symbol_style(symbol, geom_type, layer_opacity=1.0):
     """
-    Extrae color de relleno, borde e ícono de un QgsSymbol (el que sea:
-    de un renderer de símbolo único, categorizado, graduado o de reglas)
-    y devuelve un dict con las propiedades equivalentes en KML.
+    Extrae color de relleno, borde e ícono de un QgsSymbol, incorporando
+    tanto la opacidad del símbolo como la opacidad global de la capa
+    (dos multiplicadores independientes del alfa del color en QGIS).
     """
     props = {}
+    symbol_opacity = symbol.opacity() if hasattr(symbol, "opacity") else 1.0
+    total_opacity = max(0.0, min(1.0, symbol_opacity * layer_opacity))
+
+    def _color_with_opacity(qcolor):
+        alpha = int(round(qcolor.alpha() * total_opacity))
+        return simplekml.Color.rgb(qcolor.red(), qcolor.green(), qcolor.blue(), alpha)
 
     if geom_type == 2:  # Polígono
         fill_color = symbol.color()
-        props["has_fill"] = fill_color.alpha() > 0
-        props["fill_color"] = _qcolor_to_kml(fill_color)
+        effective_fill_alpha = fill_color.alpha() * total_opacity
+        props["has_fill"] = effective_fill_alpha > 0
+        props["fill_color"] = _color_with_opacity(fill_color)
 
         stroke_color = None
         stroke_width = 1.0
-        for layer in symbol.symbolLayers():
-            if hasattr(layer, "strokeColor"):
-                stroke_color = layer.strokeColor()
-                stroke_width = layer.strokeWidth() if hasattr(layer, "strokeWidth") else 1.0
+        for slayer in symbol.symbolLayers():
+            if hasattr(slayer, "strokeColor"):
+                stroke_color = slayer.strokeColor()
+                stroke_width = slayer.strokeWidth() if hasattr(slayer, "strokeWidth") else 1.0
+                break
+            elif hasattr(slayer, "color") and hasattr(slayer, "width"):
+                stroke_color = slayer.color()
+                stroke_width = slayer.width()
                 break
 
         if stroke_color is not None:
-            props["has_line"] = stroke_color.alpha() > 0
-            props["line_color"] = _qcolor_to_kml(stroke_color)
-            props["line_width"] = max(stroke_width * 3.78, 0.5)  # mm aprox. a px
+            effective_line_alpha = stroke_color.alpha() * total_opacity
+            props["has_line"] = effective_line_alpha > 0
+            props["line_color"] = _color_with_opacity(stroke_color)
+            props["line_width"] = max(stroke_width * 3.78, 0.5)
         else:
             props["has_line"] = False
 
     elif geom_type == 1:  # Línea
         line_color = symbol.color()
         width = 1.0
-        for layer in symbol.symbolLayers():
-            if hasattr(layer, "width"):
-                width = layer.width()
+        for slayer in symbol.symbolLayers():
+            if hasattr(slayer, "width"):
+                width = slayer.width()
                 break
-        props["line_color"] = _qcolor_to_kml(line_color)
+        props["line_color"] = _color_with_opacity(line_color)
         props["line_width"] = max(width * 3.78, 0.5)
 
     elif geom_type == 0:  # Punto
         point_color = symbol.color()
-        props["icon_color"] = _qcolor_to_kml(point_color)
+        props["icon_color"] = _color_with_opacity(point_color)
         size = symbol.size() if hasattr(symbol, "size") else 3.0
         props["icon_scale"] = max(size / 3.0, 0.5)
 
@@ -301,6 +313,7 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
 
     renderer = layer.renderer()
     render_context = QgsRenderContext()
+    layer_opacity = layer.opacity() if hasattr(layer, "opacity") else 1.0
     if renderer is not None:
         renderer.startRender(render_context, layer.fields())
 
@@ -341,7 +354,7 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
         if renderer is not None:
             symbol = renderer.symbolForFeature(feature, render_context)
             if symbol is not None:
-                style_props = _extract_symbol_style(symbol, geom.type())
+                style_props = _extract_symbol_style(symbol, geom.type(), layer_opacity=layer_opacity)
                 _apply_style_to_placemark(
                     placemark, style_props, geom.type(),
                     symbol=symbol, usar_iconos_clasicos=usar_iconos_clasicos,
