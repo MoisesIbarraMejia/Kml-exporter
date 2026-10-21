@@ -225,6 +225,16 @@
     </layout>
     </widget>
     </item>
+    <item>
+        <widget class="QCheckBox" name="checkBoxOmitirVacios">
+            <property name="text">
+            <string>Omitir atributos nulos o vacíos en cada objeto</string>
+            </property>
+            <property name="checked">
+            <bool>true</bool>
+            </property>
+        </widget>
+    </item>
    <item>
     <widget class="QGroupBox" name="groupBox_4">
      <property name="title">

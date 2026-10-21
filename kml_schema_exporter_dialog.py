@@ -84,7 +84,6 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
 
     def on_batch_mode_toggled(self, checked):
         """Alterna la UI entre modo normal (un archivo) y modo por lotes (varios)."""
-        self.groupBoxCarpetas.setEnabled(not checked)
         self.comboCampoLotes.setVisible(checked)
         self.labelCampoLotes.setVisible(checked)
         self.lineEditDocumentName.setEnabled(not checked)
@@ -346,8 +345,7 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
         group_field = None
         reference_layer = None
         reference_name_field = None
-        if (self.checkBoxAgruparCarpetas.isChecked()
-                and not self.checkBoxExportarPorLotes.isChecked()):
+        if self.checkBoxAgruparCarpetas.isChecked():
             group_field = self.comboCampoCarpetas.currentText()
             if not group_field:
                 QMessageBox.warning(self, "Aviso", "Selecciona el campo de agrupación.")
@@ -365,6 +363,8 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
             and self.checkBoxIconosClasicos.isChecked()
         )
 
+        omitir_vacios = self.checkBoxOmitirVacios.isChecked()
+
         try:
             if self.checkBoxExportarPorLotes.isChecked():
                 from .kml_export_logic import export_layer_to_kml_batch
@@ -373,7 +373,11 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
                     layer, field_mapping, output_path, batch_field,
                     name_field=name_field,
                     description_field=description_field,
-                    usar_iconos_clasicos=usar_iconos_clasicos
+                    usar_iconos_clasicos=usar_iconos_clasicos,
+                    group_field=group_field,
+                    reference_layer=reference_layer,
+                    reference_name_field=reference_name_field,
+                    omitir_vacios=omitir_vacios
                 )
                 QMessageBox.information(
                     self, "Éxito",
@@ -391,10 +395,12 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
                     usar_iconos_clasicos=usar_iconos_clasicos,
                     group_field=group_field,
                     reference_layer=reference_layer,
-                    reference_name_field=reference_name_field
+                    reference_name_field=reference_name_field,
+                    omitir_vacios=omitir_vacios
                 )
                 QMessageBox.information(
-                    self, "Éxito", f"Exportado correctamente a:\n{output_path}")
+                    self, "Éxito",
+                    f"Se generaron {len(generated)} archivos KML en:\n{output_path}")
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Falló la exportación:\n{str(e)}")

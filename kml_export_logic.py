@@ -49,6 +49,12 @@ def _qgis_field_type_to_kml(field_type_name):
     }
     return mapping.get(field_type_name.lower(), "string")
 
+def _is_empty_value(value):
+    """True si el valor es None, NULL de QGIS o texto vacío."""
+    if value is None or value == NULL:
+        return True
+    return str(value).strip() == ""
+
 
 def _build_balloon_text(schema_name, included_field_names, has_name, has_description):
     parts = []
@@ -261,7 +267,8 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
                         description_field=None, document_name=None, folder_name=None,
                         feature_request=None, usar_iconos_clasicos=True,
                         group_field=None, reference_layer=None,
-                        reference_name_field=None):
+                        reference_name_field=None, reference_match_value=None,
+                        omitir_vacios=False):
     """
     Exporta una capa vectorial de QGIS a KML usando simplekml, conservando:
     - SchemaData con los campos y nombres elegidos por el usuario (opcional)
@@ -330,7 +337,7 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
     if group_field and reference_layer is not None:
         _add_reference_features(
             kml, reference_layer, reference_name_field,
-            usar_iconos_clasicos, icon_cache)
+            usar_iconos_clasicos, icon_cache, reference_match_value)
 
     for feature in layer.getFeatures(feature_request or QgsFeatureRequest()):
         geom = feature.geometry()
@@ -344,26 +351,34 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
         placemark_desc = (
             str(feature.attribute(description_field)) if description_field else ""
         )
+        if omitir_vacios:
+            if name_field and _is_empty_value(feature.attribute(name_field)):
+                placemark_name = ""
+            if description_field and _is_empty_value(feature.attribute(description_field)):
+                placemark_desc = ""
+            feature_fields = [n for n in included_names
+                              if not _is_empty_value(feature.attribute(n))]
+        else:
+            feature_fields = included_names
 
-        # 1) Primero se crea el placemark (geometría)
         target_folder = folder
         if group_field:
-            raw = feature.attribute(group_field)
-            if raw is None or raw == NULL or str(raw).strip() == "":
+            if _is_empty_value(feature.attribute(group_field)):
                 group_name = "Sin clasificar"
             else:
-                group_name = str(raw).strip()
+                group_name = str(feature.attribute(group_field)).strip()
             if group_name not in group_folders:
                 group_folders[group_name] = kml.newfolder(name=group_name)
             target_folder = group_folders[group_name]
 
+        # 1) Primero se crea el placemark (geometría)
         placemark = _geometry_to_kml(target_folder, placemark_name, geom)
         placemark.description = placemark_desc
 
-        # 2) SchemaData: solo si hay campos incluidos, y ya con placemark creado
-        if included_names:
+        # 2) SchemaData: solo los campos con dato (o todos si no se omiten)
+        if feature_fields:
             schemadata = simplekml.SchemaData(schemaurl=schema.id)
-            for original_name in included_names:
+            for original_name in feature_fields:
                 value = feature.attribute(original_name)
                 schemadata.newsimpledata(
                     name=field_mapping[original_name],
@@ -371,8 +386,16 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
                 )
             placemark.extendeddata.schemadata = schemadata
 
-        # 3) BalloonStyle combinado (name + description + tabla)
-        placemark.style.balloonstyle.text = balloon_text
+        # 3) BalloonStyle: por objeto si se omiten vacíos
+        if omitir_vacios:
+            placemark.style.balloonstyle.text = _build_balloon_text(
+                schema_name,
+                [field_mapping[n] for n in feature_fields],
+                has_name=name_field is not None and placemark_name != "",
+                has_description=description_field is not None and placemark_desc != "",
+            )
+        else:
+            placemark.style.balloonstyle.text = balloon_text
 
         # 4) Estilo del símbolo
         if renderer is not None:
@@ -430,7 +453,9 @@ def _sanitize_filename(value):
 
 def export_layer_to_kml_batch(layer, field_mapping, output_folder, batch_field,
                                name_field=None, description_field=None,
-                               usar_iconos_clasicos=True):
+                               usar_iconos_clasicos=True, group_field=None,
+                               reference_layer=None, reference_name_field=None,
+                               omitir_vacios=False):
     """
     Genera un archivo .kml por cada valor único de batch_field.
     El nombre del archivo, el nombre del documento y el nombre de la
@@ -467,13 +492,19 @@ def export_layer_to_kml_batch(layer, field_mapping, output_folder, batch_field,
             document_name=safe_name,
             folder_name=safe_name,
             feature_request=request,
-            usar_iconos_clasicos=usar_iconos_clasicos
+            usar_iconos_clasicos=usar_iconos_clasicos,
+            group_field=group_field,
+            reference_layer=reference_layer,
+            reference_name_field=reference_name_field,
+            reference_match_value="" if value is None else str(value),
+            omitir_vacios=omitir_vacios
         )
         generated_files.append(output_path)
 
     return generated_files
 
-def _add_reference_features(kml, ref_layer, name_field, usar_iconos_clasicos, icon_cache):
+def _add_reference_features(kml, ref_layer, name_field, usar_iconos_clasicos,
+                            icon_cache, match_value=None):
     """Agrega las entidades de una capa de referencia directamente bajo el
     documento, con su nombre y el símbolo de su capa."""
     transform = QgsCoordinateTransform(
@@ -486,6 +517,11 @@ def _add_reference_features(kml, ref_layer, name_field, usar_iconos_clasicos, ic
         renderer.startRender(ctx, ref_layer.fields())
 
     for feature in ref_layer.getFeatures():
+        if match_value is not None and name_field:
+            ref_val = feature.attribute(name_field)
+            if (_is_empty_value(ref_val)
+                    or str(ref_val).strip().casefold() != str(match_value).strip().casefold()):
+                continue
         geom = feature.geometry()
         if geom is None or geom.isEmpty():
             continue
