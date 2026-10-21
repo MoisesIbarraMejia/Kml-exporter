@@ -306,7 +306,9 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
                 displayname=field_mapping[original_name],
             )
 
-    folder = kml.newfolder(name=folder_name)
+    # Con agrupación no se crea carpeta contenedora: las carpetas por valor
+    # van directamente bajo el documento.
+    folder = None if group_field else kml.newfolder(name=folder_name)
 
     group_folders = {}
 
@@ -347,7 +349,7 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
             else:
                 group_name = str(raw).strip()
             if group_name not in group_folders:
-                group_folders[group_name] = folder.newfolder(name=group_name)
+                group_folders[group_name] = kml.newfolder(name=group_name)
             target_folder = group_folders[group_name]
 
         placemark = _geometry_to_kml(target_folder, placemark_name, geom)
