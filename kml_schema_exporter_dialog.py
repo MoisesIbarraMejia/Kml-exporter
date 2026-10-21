@@ -54,6 +54,10 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
         self.checkBoxExportarPorLotes.toggled.connect(self.on_batch_mode_toggled)
         self.on_batch_mode_toggled(False)  # estado inicial
         self.checkBoxAgruparCarpetas.toggled.connect(self.on_group_mode_toggled)
+        self.checkBoxCapaReferencia.toggled.connect(self.on_reference_toggled)
+        self.comboCapaReferencia.currentIndexChanged.connect(
+            lambda _: self.populate_reference_fields()
+        )
         self.on_group_mode_toggled(False)
         self.checkBoxIconosClasicos.setChecked(True)
 
@@ -96,8 +100,35 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
         self.lineEditOutputPath.clear()
 
     def on_group_mode_toggled(self, checked):
-        """Habilita el selector de campo solo si la agrupación en carpetas está activa."""
+        """Habilita el selector de campo y la opción de capa de referencia."""
         self.comboCampoCarpetas.setEnabled(checked)
+        self.checkBoxCapaReferencia.setEnabled(checked)
+        if not checked:
+            self.checkBoxCapaReferencia.setChecked(False)
+
+    def on_reference_toggled(self, checked):
+        self.comboCapaReferencia.setEnabled(checked)
+        self.comboCampoReferencia.setEnabled(checked)
+        if checked:
+            self.populate_reference_layers()
+
+    def populate_reference_layers(self):
+        self.comboCapaReferencia.blockSignals(True)
+        self.comboCapaReferencia.clear()
+        for lyr in QgsProject.instance().mapLayers().values():
+            if lyr.type() == QgsMapLayer.VectorLayer:
+                self.comboCapaReferencia.addItem(lyr.name(), lyr.id())
+        self.comboCapaReferencia.blockSignals(False)
+        self.populate_reference_fields()
+
+    def populate_reference_fields(self):
+        self.comboCampoReferencia.clear()
+        layer_id = self.comboCapaReferencia.currentData()
+        lyr = QgsProject.instance().mapLayer(layer_id) if layer_id else None
+        if lyr is None:
+            return
+        for field in lyr.fields():
+            self.comboCampoReferencia.addItem(field.name())
 
     def on_layer_changed(self):
         """Actualiza la tabla cuando cambia la capa seleccionada."""
@@ -313,12 +344,21 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
                 return
 
         group_field = None
+        reference_layer = None
+        reference_name_field = None
         if (self.checkBoxAgruparCarpetas.isChecked()
                 and not self.checkBoxExportarPorLotes.isChecked()):
             group_field = self.comboCampoCarpetas.currentText()
             if not group_field:
                 QMessageBox.warning(self, "Aviso", "Selecciona el campo de agrupación.")
                 return
+            if self.checkBoxCapaReferencia.isChecked():
+                ref_id = self.comboCapaReferencia.currentData()
+                reference_layer = QgsProject.instance().mapLayer(ref_id) if ref_id else None
+                if reference_layer is None:
+                    QMessageBox.warning(self, "Aviso", "Selecciona la capa de referencia.")
+                    return
+                reference_name_field = self.comboCampoReferencia.currentText() or None
 
         usar_iconos_clasicos = (
             self.checkBoxIconosClasicos.isVisible()
@@ -349,7 +389,9 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
                     document_name=document_name,
                     folder_name=folder_name,
                     usar_iconos_clasicos=usar_iconos_clasicos,
-                    group_field=group_field
+                    group_field=group_field,
+                    reference_layer=reference_layer,
+                    reference_name_field=reference_name_field
                 )
                 QMessageBox.information(
                     self, "Éxito", f"Exportado correctamente a:\n{output_path}")

@@ -178,6 +178,48 @@
         </property>
         </widget>
         </item>
+        <item>
+        <widget class="QCheckBox" name="checkBoxCapaReferencia">
+        <property name="enabled">
+        <bool>false</bool>
+        </property>
+        <property name="text">
+        <string>Incluir polígono de referencia de otra capa</string>
+        </property>
+        </widget>
+        </item>
+        <item>
+        <layout class="QHBoxLayout" name="horizontalLayoutReferencia">
+        <item>
+        <widget class="QLabel" name="labelCapaReferencia">
+            <property name="text">
+            <string>Capa: </string>
+            </property>
+        </widget>
+        </item>
+        <item>
+        <widget class="QComboBox" name="comboCapaReferencia">
+            <property name="enabled">
+            <bool>false</bool>
+            </property>
+        </widget>
+        </item>
+        <item>
+        <widget class="QLabel" name="labelCampoReferencia">
+            <property name="text">
+            <string>Campo nombre: </string>
+            </property>
+        </widget>
+        </item>
+        <item>
+        <widget class="QComboBox" name="comboCampoReferencia">
+            <property name="enabled">
+            <bool>false</bool>
+            </property>
+        </widget>
+        </item>
+        </layout>
+        </item>
         </layout>
     </item>
     </layout>
