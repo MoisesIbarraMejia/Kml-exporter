@@ -53,6 +53,8 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
         QgsProject.instance().layersRemoved.connect(self.populate_layer_combo)
         self.checkBoxExportarPorLotes.toggled.connect(self.on_batch_mode_toggled)
         self.on_batch_mode_toggled(False)  # estado inicial
+        self.checkBoxAgruparCarpetas.toggled.connect(self.on_group_mode_toggled)
+        self.on_group_mode_toggled(False)
         self.checkBoxIconosClasicos.setChecked(True)
 
         # Poblar con la capa inicial si ya hay una seleccionada
@@ -78,6 +80,7 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
 
     def on_batch_mode_toggled(self, checked):
         """Alterna la UI entre modo normal (un archivo) y modo por lotes (varios)."""
+        self.groupBoxCarpetas.setEnabled(not checked)
         self.comboCampoLotes.setVisible(checked)
         self.labelCampoLotes.setVisible(checked)
         self.lineEditDocumentName.setEnabled(not checked)
@@ -91,6 +94,10 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
             self.lineEditOutputPath.setPlaceholderText("")
 
         self.lineEditOutputPath.clear()
+
+    def on_group_mode_toggled(self, checked):
+        """Habilita el selector de campo solo si la agrupación en carpetas está activa."""
+        self.comboCampoCarpetas.setEnabled(checked)
 
     def on_layer_changed(self):
         """Actualiza la tabla cuando cambia la capa seleccionada."""
@@ -123,8 +130,10 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
         fields = layer.fields()
 
         self.comboCampoLotes.clear()
+        self.comboCampoCarpetas.clear()
         for field in fields:
             self.comboCampoLotes.addItem(field.name())
+            self.comboCampoCarpetas.addItem(field.name())
 
         es_capa_de_puntos = layer.geometryType() == QgsWkbTypes.PointGeometry
         self.groupBoxIconosClasicos.setVisible(es_capa_de_puntos)
@@ -303,6 +312,14 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
             if respuesta == QMessageBox.No:
                 return
 
+        group_field = None
+        if (self.checkBoxAgruparCarpetas.isChecked()
+                and not self.checkBoxExportarPorLotes.isChecked()):
+            group_field = self.comboCampoCarpetas.currentText()
+            if not group_field:
+                QMessageBox.warning(self, "Aviso", "Selecciona el campo de agrupación.")
+                return
+
         usar_iconos_clasicos = (
             self.checkBoxIconosClasicos.isVisible()
             and self.checkBoxIconosClasicos.isChecked()
@@ -331,7 +348,8 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
                     description_field=description_field,
                     document_name=document_name,
                     folder_name=folder_name,
-                    usar_iconos_clasicos=usar_iconos_clasicos
+                    usar_iconos_clasicos=usar_iconos_clasicos,
+                    group_field=group_field
                 )
                 QMessageBox.information(
                     self, "Éxito", f"Exportado correctamente a:\n{output_path}")

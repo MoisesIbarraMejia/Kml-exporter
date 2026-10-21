@@ -24,6 +24,7 @@ from qgis.core import (
     QgsWkbTypes,
     QgsRenderContext,
     QgsFeatureRequest,
+    NULL,
 )
 
 
@@ -258,7 +259,8 @@ def _apply_style_to_placemark(placemark, props, geom_type, symbol=None,
 
 def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
                         description_field=None, document_name=None, folder_name=None,
-                        feature_request=None, usar_iconos_clasicos=True):
+                        feature_request=None, usar_iconos_clasicos=True,
+                        group_field=None):
     """
     Exporta una capa vectorial de QGIS a KML usando simplekml, conservando:
     - SchemaData con los campos y nombres elegidos por el usuario (opcional)
@@ -269,6 +271,8 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
         raise ValueError("La capa no es válida.")
     if not field_mapping and name_field is None and description_field is None:
         raise ValueError("No hay nada que exportar (ni tabla, ni Name, ni Description).")
+    if group_field and layer.fields().indexFromName(group_field) == -1:
+        raise ValueError(f"El campo de agrupación '{group_field}' no existe en la capa.")
 
     # --- Reproyección a WGS84 (obligatorio para KML) ---
     dest_crs = QgsCoordinateReferenceSystem("EPSG:4326")
@@ -304,6 +308,8 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
 
     folder = kml.newfolder(name=folder_name)
 
+    group_folders = {}
+
     balloon_text = _build_balloon_text(
         schema_name,
         [field_mapping[n] for n in included_names],
@@ -333,7 +339,18 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
         )
 
         # 1) Primero se crea el placemark (geometría)
-        placemark = _geometry_to_kml(folder, placemark_name, geom)
+        target_folder = folder
+        if group_field:
+            raw = feature.attribute(group_field)
+            if raw is None or raw == NULL or str(raw).strip() == "":
+                group_name = "Sin clasificar"
+            else:
+                group_name = str(raw).strip()
+            if group_name not in group_folders:
+                group_folders[group_name] = folder.newfolder(name=group_name)
+            target_folder = group_folders[group_name]
+
+        placemark = _geometry_to_kml(target_folder, placemark_name, geom)
         placemark.description = placemark_desc
 
         # 2) SchemaData: solo si hay campos incluidos, y ya con placemark creado

@@ -150,6 +150,40 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="groupBoxCarpetas">
+    <property name="title">
+    <string>Carpetas KML:</string>
+    </property>
+    <layout class="QVBoxLayout" name="verticalLayoutCarpetas">
+    <item>
+        <widget class="QCheckBox" name="checkBoxAgruparCarpetas">
+        <property name="text">
+        <string>Agrupar en carpetas KML (un solo archivo)</string>
+        </property>
+        </widget>
+    </item>
+    <item>
+        <layout class="QHBoxLayout" name="horizontalLayoutCarpetas">
+        <item>
+        <widget class="QLabel" name="labelCampoCarpetas">
+        <property name="text">
+            <string>Campo de agrupación: </string>
+        </property>
+        </widget>
+        </item>
+        <item>
+        <widget class="QComboBox" name="comboCampoCarpetas">
+        <property name="enabled">
+            <bool>false</bool>
+        </property>
+        </widget>
+        </item>
+        </layout>
+    </item>
+    </layout>
+    </widget>
+    </item>
+   <item>
     <widget class="QGroupBox" name="groupBox_4">
      <property name="title">
       <string>Output:</string>
