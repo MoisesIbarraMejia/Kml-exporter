@@ -399,8 +399,7 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
                     omitir_vacios=omitir_vacios
                 )
                 QMessageBox.information(
-                    self, "Éxito",
-                    f"Se generaron {len(generated)} archivos KML en:\n{output_path}")
+                    self, "Éxito", f"Exportado correctamente a:\n{output_path}")
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Falló la exportación:\n{str(e)}")
