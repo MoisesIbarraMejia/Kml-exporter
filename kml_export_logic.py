@@ -268,7 +268,7 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
                         feature_request=None, usar_iconos_clasicos=True,
                         group_field=None, reference_layer=None,
                         reference_name_field=None, reference_match_value=None,
-                        omitir_vacios=False):
+                        omitir_vacios=False, extra_layers=None):
     """
     Exporta una capa vectorial de QGIS a KML usando simplekml, conservando:
     - SchemaData con los campos y nombres elegidos por el usuario (opcional)
@@ -338,6 +338,14 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
         _add_reference_features(
             kml, reference_layer, reference_name_field,
             usar_iconos_clasicos, icon_cache, reference_match_value)
+
+    extra_folders = []
+    for extra_layer, extra_name_field in (extra_layers or []):
+        extra_folder = kml.newfolder(name=extra_layer.name())
+        extra_folders.append(extra_folder)
+        _add_reference_features(
+            kml, extra_layer, extra_name_field,
+            usar_iconos_clasicos, icon_cache, container=extra_folder)
 
     for feature in layer.getFeatures(feature_request or QgsFeatureRequest()):
         geom = feature.geometry()
@@ -415,7 +423,7 @@ def export_layer_to_kml(layer, field_mapping, output_path, name_field=None,
     # Mover los estilos al nivel del Document. Un <Style> dentro de un <Folder>
     # es el estilo de la propia carpeta y Google Earth la muestra como enlace
     # con globo. Los placemarks siguen apuntando a ellos por styleUrl.
-    containers = list(group_folders.values())
+    containers = list(group_folders.values()) + extra_folders
     if folder is not None:
         containers.append(folder)
     for container in containers:
@@ -504,9 +512,10 @@ def export_layer_to_kml_batch(layer, field_mapping, output_folder, batch_field,
     return generated_files
 
 def _add_reference_features(kml, ref_layer, name_field, usar_iconos_clasicos,
-                            icon_cache, match_value=None):
+                            icon_cache, match_value=None, container=None):
     """Agrega las entidades de una capa de referencia directamente bajo el
     documento, con su nombre y el símbolo de su capa."""
+    target = container if container is not None else kml
     transform = QgsCoordinateTransform(
         ref_layer.crs(), QgsCoordinateReferenceSystem("EPSG:4326"),
         QgsProject.instance())
@@ -527,7 +536,7 @@ def _add_reference_features(kml, ref_layer, name_field, usar_iconos_clasicos,
             continue
         geom.transform(transform)
         name = str(feature.attribute(name_field)) if name_field else ref_layer.name()
-        placemark = _geometry_to_kml(kml, name, geom)
+        placemark = _geometry_to_kml(target, name, geom)
         if renderer is not None:
             symbol = renderer.symbolForFeature(feature, ctx)
             if symbol is not None:

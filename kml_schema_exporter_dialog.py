@@ -24,7 +24,8 @@
 
 import os
 from qgis.PyQt import uic
-from qgis.PyQt.QtWidgets import QDialog, QTableWidgetItem, QFileDialog, QMessageBox
+from qgis.PyQt.QtWidgets import (QDialog, QTableWidgetItem, QFileDialog,
+                                 QMessageBox, QComboBox)
 from qgis.core import QgsProject, QgsMapLayer
 from qgis.PyQt.QtCore import Qt
 from qgis.core import QgsProject, QgsMapLayer, QgsWkbTypes
@@ -84,6 +85,7 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
 
     def on_batch_mode_toggled(self, checked):
         """Alterna la UI entre modo normal (un archivo) y modo por lotes (varios)."""
+        self.groupBoxCapasExtra.setEnabled(not checked)
         self.comboCampoLotes.setVisible(checked)
         self.labelCampoLotes.setVisible(checked)
         self.lineEditDocumentName.setEnabled(not checked)
@@ -129,6 +131,56 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
         for field in lyr.fields():
             self.comboCampoReferencia.addItem(field.name())
 
+    def populate_extra_layers_table(self):
+        """Una fila por capa vectorial (excepto la capa actual)."""
+        table = self.tableCapasExtra
+        table.blockSignals(True)
+        table.setRowCount(0)
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["Incluir", "Capa", "Campo nombre"])
+        current = self._get_current_layer()
+        row = 0
+        for lyr in QgsProject.instance().mapLayers().values():
+            if lyr.type() != QgsMapLayer.VectorLayer:
+                continue
+            if current is not None and lyr.id() == current.id():
+                continue
+            table.insertRow(row)
+
+            chk = QTableWidgetItem()
+            chk.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            chk.setCheckState(Qt.Unchecked)
+            chk.setData(Qt.UserRole, lyr.id())
+            table.setItem(row, 0, chk)
+
+            name_item = QTableWidgetItem(lyr.name())
+            name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
+            table.setItem(row, 1, name_item)
+
+            combo = QComboBox()
+            combo.addItem("(nombre de la capa)", None)
+            for f in lyr.fields():
+                combo.addItem(f.name(), f.name())
+            table.setCellWidget(row, 2, combo)
+            row += 1
+        table.resizeColumnsToContents()
+        table.blockSignals(False)
+
+    def get_extra_layers(self):
+        """Devuelve [(capa, campo_nombre_o_None), ...] de las filas marcadas."""
+        result = []
+        table = self.tableCapasExtra
+        for row in range(table.rowCount()):
+            chk = table.item(row, 0)
+            if chk is None or chk.checkState() != Qt.Checked:
+                continue
+            lyr = QgsProject.instance().mapLayer(chk.data(Qt.UserRole))
+            if lyr is None:
+                continue
+            combo = table.cellWidget(row, 2)
+            result.append((lyr, combo.currentData() if combo is not None else None))
+        return result
+
     def on_layer_changed(self):
         """Actualiza la tabla cuando cambia la capa seleccionada."""
         layer = self._get_current_layer()
@@ -146,6 +198,7 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
 
     def populate_field_table(self, layer):
         """Se dispara cada vez que el usuario cambia de capa."""
+        self.populate_extra_layers_table()
         self.tableFieldMapping.blockSignals(True)
         self.tableFieldMapping.setRowCount(0)
 
@@ -364,6 +417,7 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
         )
 
         omitir_vacios = self.checkBoxOmitirVacios.isChecked()
+        extra_layers = self.get_extra_layers()
 
         try:
             if self.checkBoxExportarPorLotes.isChecked():
@@ -396,7 +450,8 @@ class KmlExporterDialog(QDialog, FORM_CLASS):
                     group_field=group_field,
                     reference_layer=reference_layer,
                     reference_name_field=reference_name_field,
-                    omitir_vacios=omitir_vacios
+                    omitir_vacios=omitir_vacios,
+                    extra_layers=extra_layers
                 )
                 QMessageBox.information(
                     self, "Éxito", f"Exportado correctamente a:\n{output_path}")

@@ -226,6 +226,25 @@
     </widget>
     </item>
     <item>
+        <widget class="QGroupBox" name="groupBoxCapasExtra">
+        <property name="title">
+        <string>Capas adicionales (cada una como carpeta):</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayoutCapasExtra">
+        <item>
+            <widget class="QTableWidget" name="tableCapasExtra">
+            <property name="maximumSize">
+            <size>
+            <width>16777215</width>
+            <height>120</height>
+            </size>
+            </property>
+            </widget>
+        </item>
+        </layout>
+        </widget>
+    </item>
+    <item>
         <widget class="QCheckBox" name="checkBoxOmitirVacios">
             <property name="text">
             <string>Omitir atributos nulos o vacíos en cada objeto</string>
